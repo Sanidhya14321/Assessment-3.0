@@ -3,62 +3,62 @@ import React from "react";
 
 export default function VideoBackground() {
   const [frameIndex, setFrameIndex] = useState(0);
-  const totalFrames = 200;
+  const totalFrames = 500;
   const frames = useRef([]);
-  const lastScrollY = useRef(0); // store previous scroll position
 
-  // Preload frames
+  // Preload the first frame
   useEffect(() => {
-    const loadedFrames = [];
-    for (let i = 1; i <= totalFrames; i++) {
-      const frameNum = String(i).padStart(3, "0");
-      const img = new Image();
-      img.src = `/VideoBG/ezgif-frame-${frameNum}.jpg`;
-      loadedFrames.push(img);
-    }
-    frames.current = loadedFrames;
-    setFrameIndex(0); // show first frame immediately
+    const img = new Image();
+    img.src = `/VideoBG1/x %281%29.jpg`; // removed space before %
+    frames.current[0] = img;
+    setFrameIndex(0);
   }, []);
 
-  // Scroll velocity-based frame control
+  // Lazy load a specific frame
+  const loadFrame = (index) => {
+    if (!frames.current[index]) {
+      const img = new Image();
+      img.src = `/VideoBG1/x %28${index + 1}%29.jpg`; // +1 because index starts at 0
+      frames.current[index] = img;
+    }
+  };
+
   useEffect(() => {
     const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      const scrollDelta = currentScrollY - lastScrollY.current;
+      const scrollTop = window.scrollY;
+      const maxScroll = document.body.scrollHeight - window.innerHeight;
 
-      if (scrollDelta > 0) {
-        // scrolling down → next frame
-        setFrameIndex((prev) => (prev + 1) % totalFrames);
-      } else if (scrollDelta < 0) {
-        // scrolling up → previous frame
-        setFrameIndex((prev) =>
-          prev === 0 ? totalFrames - 1 : prev - 1
-        );
-      }
+      // Map scroll position to frame index
+      const scrollFraction = scrollTop / maxScroll;
+      const newFrameIndex = Math.min(
+        totalFrames - 1,
+        Math.floor(scrollFraction * totalFrames)
+      );
 
-      lastScrollY.current = currentScrollY;
+      loadFrame(newFrameIndex);
+      setFrameIndex(newFrameIndex);
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [totalFrames]);
+  }, []);
 
   return (
     <div
-      className="w-screen  overflow-hidden relative"
+      className=" overflow-x-hidden overflow-y-hidden relative h-[600vh]"
       style={{ backgroundColor: "black" }}
     >
-      {frames.current.length > 0 && (
+      {frames.current[frameIndex] && (
         <img
-          src={frames.current[frameIndex]?.src}
+          src={frames.current[frameIndex].src}
           alt="background"
-          className="fixed top-0 left-0 w-full h-full object-cover blur-sm"
+          className="fixed top-0 left-0 w-full h-full object-cover blur-[2px]"
           draggable="false"
+          style={{
+            imageRendering: "high-quality",
+          }}
         />
       )}
-
-      {/* Minimal scrollable space */}
-      <div style={{ height: "500vh" }}></div>
     </div>
   );
 }

@@ -12,6 +12,7 @@
   "dependencies": {
     "@studio-freight/lenis": "^1.0.42",
     "@tailwindcss/vite": "^4.1.11",
+    "framer-motion": "^12.23.12",
     "gsap": "^3.13.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

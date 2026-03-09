@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# EduAssess
 
-## Getting Started
+EduAssess is a Next.js assessment platform with:
+- Groq-backed Genkit recommendations
+- PostgreSQL + Prisma persistence
+- Neo-brutalist visual design system
 
-First, run the development server:
+## 1. Setup
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Create environment file:
+
+```bash
+cp .env.example .env
+```
+
+Fill `.env`:
+
+- `DATABASE_URL`: PostgreSQL connection string
+- `GROQ_API_KEY`: Groq API key
+- `JWT_SECRET`: random secret for signing auth cookies
+- `ADMIN_EMAIL`: default admin login email
+- `ADMIN_PASSWORD`: default admin login password (seeded if absent)
+
+Generate Prisma client and run migrations:
+
+```bash
+npm run prisma:generate
+npm run prisma:migrate
+npm run prisma:seed
+```
+
+## 2. Run
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+App runs on `http://localhost:9002`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 3. Data Model
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Prisma schema is in `prisma/schema.prisma`.
 
-## Learn More
+Main entities:
+- `Assessment`
+- `AssessmentResult`
 
-To learn more about Next.js, take a look at the following resources:
+On first load, predefined assessments from `src/lib/constants.ts` are seeded into PostgreSQL.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 4. API Endpoints
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `GET /api/assessments`
+- `POST /api/assessments`
+- `GET /api/results?userId=<id>`
+- `POST /api/results`
+- `GET /api/admin/stats`
+- `POST /api/recommendations`

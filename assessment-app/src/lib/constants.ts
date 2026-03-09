@@ -216,21 +216,16 @@ export const PREDEFINED_ASSESSMENTS: Assessment[] = [
 export const NAV_LINKS = [
   { href: '/', label: 'Home', icon: 'Home' },
   { href: '/assessments', label: 'Assessments', icon: 'BookOpenCheck' },
+  { href: '/assessments/create', label: 'Create Assessment', icon: 'PlusSquare' },
   { href: '/profile', label: 'Profile', icon: 'UserCircle' },
   { href: '/admin', label: 'Admin', icon: 'ShieldCheck', adminOnly: true },
 ];
 
-export const MOCK_ADMIN_ID = "admin_secure_456";
-export const ADMIN_EMAIL = "admin@example.com";
-export const ADMIN_PASSWORD = "adminpass"; 
-export const LOCAL_STORAGE_USERS_KEY = "eduAssessUsers";
-export const LOCAL_STORAGE_USER_ID_KEY = "eduAssessCurrentUserId";
-export const LOCAL_STORAGE_ASSESSMENT_HISTORY_KEY = "eduAssessAssessmentHistory";
 export const LOCAL_STORAGE_THEME_KEY = "eduAssessTheme";
 export const LOCAL_STORAGE_THEME_MODE_KEY = "eduAssessThemeMode";
 
 
-export const DEFAULT_THEME_NAME = "EduAssess Default";
+export const DEFAULT_THEME_NAME = "QuestionFlow Default";
 
 export const APP_THEMES: AppTheme[] = [
   {

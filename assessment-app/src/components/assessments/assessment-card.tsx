@@ -2,6 +2,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { Assessment } from "@/lib/types";
@@ -22,17 +23,33 @@ const categoryIcons: { [key: string]: React.ElementType } = {
 
 export function AssessmentCard({ assessment }: AssessmentCardProps) {
   const IconComponent = categoryIcons[assessment.category] || Code;
+  const [upvotes, setUpvotes] = useState(assessment.upvotes);
+  const [downvotes, setDownvotes] = useState(assessment.downvotes);
+
+  const submitVote = async (voteType: "up" | "down") => {
+    const response = await fetch(`/api/assessments/${assessment.id}/vote`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ voteType }),
+    });
+
+    if (!response.ok) {
+      return;
+    }
+
+    const payload: { upvotes: number; downvotes: number } = await response.json();
+    setUpvotes(payload.upvotes);
+    setDownvotes(payload.downvotes);
+  };
 
   const handleUpvote = (e: React.MouseEvent) => {
     e.preventDefault();
-    console.log("Upvoted:", assessment.id);
-    // TODO: Implement upvote server action for non-predefined assessments
+    submitVote("up");
   };
 
   const handleDownvote = (e: React.MouseEvent) => {
     e.preventDefault();
-    console.log("Downvoted:", assessment.id);
-    // TODO: Implement downvote server action for non-predefined assessments
+    submitVote("down");
   };
 
   return (
@@ -81,10 +98,10 @@ export function AssessmentCard({ assessment }: AssessmentCardProps) {
           ) : (
             <div className="flex items-center gap-2 mb-3 sm:mb-0">
               <Button variant="ghost" size="sm" onClick={handleUpvote} className="group text-muted-foreground hover:text-green-500">
-                <ThumbsUp className="w-4 h-4 mr-1 group-hover:fill-green-500/20" /> {assessment.upvotes}
+                <ThumbsUp className="w-4 h-4 mr-1 group-hover:fill-green-500/20" /> {upvotes}
               </Button>
               <Button variant="ghost" size="sm" onClick={handleDownvote} className="group text-muted-foreground hover:text-red-500">
-                <ThumbsDown className="w-4 h-4 mr-1 group-hover:fill-red-500/20" /> {assessment.downvotes}
+                <ThumbsDown className="w-4 h-4 mr-1 group-hover:fill-red-500/20" /> {downvotes}
               </Button>
             </div>
           )}

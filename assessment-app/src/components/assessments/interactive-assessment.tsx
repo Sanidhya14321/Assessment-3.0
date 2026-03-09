@@ -10,20 +10,18 @@ import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, ArrowRight, CheckSquare } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
-import { LOCAL_STORAGE_USER_ID_KEY, LOCAL_STORAGE_ASSESSMENT_HISTORY_KEY } from "@/lib/constants";
 
 async function saveAssessmentResult(result: AssessmentResult): Promise<void> {
-  console.log("Saving assessment result:", result);
-  try {
-    const historyString = localStorage.getItem(LOCAL_STORAGE_ASSESSMENT_HISTORY_KEY);
-    const history: AssessmentResult[] = historyString ? JSON.parse(historyString) : [];
-    history.push(result);
-    localStorage.setItem(LOCAL_STORAGE_ASSESSMENT_HISTORY_KEY, JSON.stringify(history));
-  } catch (e) {
-    console.error("Failed to save assessment result to localStorage", e);
-    // Potentially inform the user or log more robustly
+  const response = await fetch("/api/results", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(result),
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(payload?.message || "Failed to save result");
   }
-  return new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
 }
 
 
@@ -42,10 +40,17 @@ export function InteractiveAssessment({ assessment }: InteractiveAssessmentProps
   const [currentUserId, setCurrentUserId] = useState<string>("guestUser");
 
   useEffect(() => {
-    const userId = localStorage.getItem(LOCAL_STORAGE_USER_ID_KEY);
-    if (userId) {
-      setCurrentUserId(userId);
-    }
+    const loadSession = async () => {
+      const response = await fetch("/api/auth/me", { cache: "no-store" });
+      if (!response.ok) {
+        setCurrentUserId("guestUser");
+        return;
+      }
+      const session: { userId: string } = await response.json();
+      setCurrentUserId(session.userId);
+    };
+
+    loadSession();
   }, []);
 
   const currentQuestion = assessment.questions[currentQuestionIndex];

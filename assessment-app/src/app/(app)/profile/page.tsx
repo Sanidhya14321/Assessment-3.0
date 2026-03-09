@@ -5,61 +5,66 @@ import { useState, useEffect } from "react";
 import { UserInfo } from "@/components/profile/user-info";
 import { AssessmentHistory } from "@/components/profile/assessment-history";
 import { RecommendedAssessments } from "@/components/profile/recommended-assessments";
-import type { User, AssessmentResult, StoredUser } from "@/lib/types";
-import { MOCK_ADMIN_ID, ADMIN_EMAIL, LOCAL_STORAGE_USERS_KEY, LOCAL_STORAGE_USER_ID_KEY, LOCAL_STORAGE_ASSESSMENT_HISTORY_KEY } from "@/lib/constants";
+import type { User, AssessmentResult, Assessment } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { LogIn, UserCircle2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { PerfectScoreBadges } from "@/components/profile/perfect-score-badges";
 
 async function getUserData(userId: string): Promise<User | null> {
-  if (userId === MOCK_ADMIN_ID) {
-    let adminHistory: AssessmentResult[] = [];
-    const historyString = localStorage.getItem(LOCAL_STORAGE_ASSESSMENT_HISTORY_KEY);
-    if (historyString) {
-      adminHistory = JSON.parse(historyString).filter((r: AssessmentResult) => r.userId === MOCK_ADMIN_ID);
-    }
-    return {
-      id: MOCK_ADMIN_ID,
-      name: "Site Administrator",
-      email: ADMIN_EMAIL,
-      role: "admin",
-      assessmentHistory: adminHistory,
-      interests: ["Site Management", "Assessment Quality", "AI/ML", "Web Development"], // Example admin interests
-    };
-  }
+  const [sessionResponse, historyResponse] = await Promise.all([
+    fetch("/api/auth/me", { cache: "no-store" }),
+    fetch(`/api/results?userId=${encodeURIComponent(userId)}`, { cache: "no-store" }),
+  ]);
 
-  // Fetch regular user data
-  const usersString = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
-  const storedUsers: StoredUser[] = usersString ? JSON.parse(usersString) : [];
-  const storedUser = storedUsers.find(u => u.id === userId);
+  if (!sessionResponse.ok) return null;
+  const session = (await sessionResponse.json()) as { userId: string; name: string; email: string; role: "user" | "admin" };
+  const history: AssessmentResult[] = historyResponse.ok ? await historyResponse.json() : [];
 
-  if (storedUser) {
-    let userHistory: AssessmentResult[] = [];
-    const historyString = localStorage.getItem(LOCAL_STORAGE_ASSESSMENT_HISTORY_KEY);
-    if (historyString) {
-      userHistory = JSON.parse(historyString).filter((r: AssessmentResult) => r.userId === userId);
-    }
-    return {
-      id: storedUser.id,
-      name: storedUser.name,
-      email: storedUser.email,
-      role: "user",
-      assessmentHistory: userHistory,
-      interests: ["Learning New Technologies", "Problem Solving"], // Placeholder interests for regular users
-    };
-  }
-  return null;
+  return {
+    id: session.userId,
+    name: session.name,
+    email: session.email,
+    role: session.role,
+    assessmentHistory: history,
+    interests: session.role === "admin" ? ["Site Management", "Assessment Quality"] : ["Learning New Technologies", "Problem Solving"],
+  };
 }
 
 export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
 
   useEffect(() => {
-    const id = localStorage.getItem(LOCAL_STORAGE_USER_ID_KEY);
-    setCurrentUserId(id);
+    const loadSession = async () => {
+      const response = await fetch("/api/auth/me", { cache: "no-store" });
+      if (!response.ok) {
+        setCurrentUserId(null);
+        return;
+      }
+      const session: { userId: string } = await response.json();
+      setCurrentUserId(session.userId);
+    };
+
+    loadSession();
+  }, []);
+
+  useEffect(() => {
+    const loadAssessments = async () => {
+      try {
+        const response = await fetch("/api/assessments", { cache: "no-store" });
+        if (!response.ok) throw new Error();
+        const data: Assessment[] = await response.json();
+        setAssessments(data);
+      } catch {
+        setAssessments([]);
+      }
+    };
+
+    loadAssessments();
   }, []);
 
   useEffect(() => {
@@ -70,7 +75,6 @@ export default function ProfilePage() {
         setUser(data);
         setIsLoading(false);
       } else {
-        // No user ID found in localStorage after initial check
         setUser(null);
         setIsLoading(false);
       }
@@ -118,18 +122,17 @@ export default function ProfilePage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-4xl font-headline font-bold text-primary mb-2">
-          {user.role === 'admin' ? 'Admin Profile' : `${user.name}'s Profile`}
+          {`${user.name}'s Profile`}
         </h1>
         <p className="text-lg text-muted-foreground">
-          {user.role === 'admin' 
-            ? 'Manage your admin information and oversee assessments.'
-            : 'View your assessment history and discover new challenges.'}
+          {'View your assessment history and discover new challenges.'}
         </p>
       </div>
       
       <UserInfo user={user} />
+      <PerfectScoreBadges perfectScoreCount={(user.assessmentHistory || []).filter((entry) => entry.scorePercentage === 100).length} />
       <AssessmentHistory history={user.assessmentHistory || []} />
-      <RecommendedAssessments user={user} /> {/* This will now also work for regular users */}
+      <RecommendedAssessments user={user} assessments={assessments} />
       
       <div className="mt-12 text-center">
         <Button variant="outline" disabled>Edit Profile (Coming Soon)</Button>

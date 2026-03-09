@@ -1,44 +1,82 @@
-import { assessmentRecommendation, type AssessmentRecommendationInput } from "@/ai/flows/assessment-recommendation";
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PREDEFINED_ASSESSMENTS } from "@/lib/constants";
-import type { User, AssessmentResult, AvailableAssessmentInfo, UserHistoryEntry } from "@/lib/types";
+import type { User, AssessmentResult, AvailableAssessmentInfo, UserHistoryEntry, Assessment } from "@/lib/types";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Brain, Lightbulb } from "lucide-react";
 import Image from "next/image";
 
-
 interface RecommendedAssessmentsProps {
-  user: User | null; // User object which includes assessmentHistory and interests
+  user: User | null;
+  assessments: Assessment[];
 }
 
-// Helper to find full assessment details from title
-const findAssessmentByTitle = (title: string) => {
-  return PREDEFINED_ASSESSMENTS.find(a => a.title.toLowerCase() === title.toLowerCase());
+const findAssessmentByTitle = (assessments: Assessment[], title: string) => {
+  return assessments.find((a) => a.title.toLowerCase() === title.toLowerCase());
 };
 
-export async function RecommendedAssessments({ user }: RecommendedAssessmentsProps) {
+export function RecommendedAssessments({ user, assessments }: RecommendedAssessmentsProps) {
+  const [recommendations, setRecommendations] = useState<string[]>([]);
+
+  const userHistory = useMemo<UserHistoryEntry[]>(() => {
+    if (!user) return [];
+
+    const history = (user.assessmentHistory || []).map((result: AssessmentResult) => ({
+      assessmentCategory: result.category,
+      score: result.scorePercentage,
+      interests: user.interests?.join(", ") || "General Computer Science",
+    }));
+
+    if (history.length === 0 && user.interests && user.interests.length > 0) {
+      history.push({
+        assessmentCategory: "AI/ML",
+        score: 0,
+        interests: user.interests.join(", "),
+      });
+    }
+
+    return history;
+  }, [user]);
+
+  useEffect(() => {
+    const loadRecommendations = async () => {
+      if (!user || userHistory.length === 0 || assessments.length === 0) {
+        setRecommendations([]);
+        return;
+      }
+
+      const availableAssessments: AvailableAssessmentInfo[] = assessments.map((assessment) => ({
+        assessmentCategory: assessment.category,
+        assessmentTitle: assessment.title,
+      }));
+
+      try {
+        const response = await fetch("/api/recommendations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userHistory, availableAssessments }),
+        });
+
+        if (!response.ok) throw new Error("Failed to fetch recommendations");
+        const result: { recommendations: string[] } = await response.json();
+        setRecommendations(result.recommendations || []);
+      } catch (error) {
+        console.error("Error fetching assessment recommendations:", error);
+        setRecommendations([]);
+      }
+    };
+
+    loadRecommendations();
+  }, [user, userHistory, assessments]);
+
   if (!user) {
-    return null; // Or some placeholder if user data isn't available yet
+    return null;
   }
 
-  // Prepare input for the AI flow
-  const userHistory: UserHistoryEntry[] = (user.assessmentHistory || []).map((result: AssessmentResult) => ({
-    assessmentCategory: result.category,
-    score: result.scorePercentage,
-    interests: user.interests?.join(', ') || 'General Computer Science', // Combine interests or provide a default
-  }));
-
-  // If no history, provide general interests if available
-  if (userHistory.length === 0 && user.interests && user.interests.length > 0) {
-    userHistory.push({
-      assessmentCategory: "General",
-      score: 0, // No score as no assessments taken
-      interests: user.interests.join(', '),
-    });
-  } else if (userHistory.length === 0 && (!user.interests || user.interests.length === 0)) {
-     // If no history and no interests, maybe show popular or introductory assessments
-     return (
+  if (userHistory.length === 0) {
+    return (
       <Card className="shadow-xl bg-card mt-8">
         <CardHeader>
           <CardTitle className="font-headline text-2xl flex items-center">
@@ -51,55 +89,35 @@ export async function RecommendedAssessments({ user }: RecommendedAssessmentsPro
             In the meantime, here are some popular starting points:
           </p>
           <div className="space-y-3">
-            {PREDEFINED_ASSESSMENTS.slice(0,2).map(assessment => (
-                <Link href={`/assessments/${assessment.id}`} key={assessment.id} className="block p-3 border rounded-md hover:bg-accent/10 transition-colors">
-                    <h4 className="font-semibold text-foreground">{assessment.title}</h4>
-                    <p className="text-sm text-muted-foreground">{assessment.category}</p>
-                </Link>
+            {assessments.slice(0, 2).map((assessment) => (
+              <Link href={`/assessments/${assessment.id}`} key={assessment.id} className="block p-3 border rounded-md hover:bg-accent/10 transition-colors">
+                <h4 className="font-semibold text-foreground">{assessment.title}</h4>
+                <p className="text-sm text-muted-foreground">{assessment.category}</p>
+              </Link>
             ))}
           </div>
         </CardContent>
       </Card>
-     );
+    );
   }
 
-
-  const availableAssessments: AvailableAssessmentInfo[] = PREDEFINED_ASSESSMENTS.map(assessment => ({
-    assessmentCategory: assessment.category,
-    assessmentTitle: assessment.title,
-  }));
-
-  const recommendationInput: AssessmentRecommendationInput = {
-    userHistory,
-    availableAssessments,
-  };
-
-  let recommendations: string[] = [];
-  try {
-    const result = await assessmentRecommendation(recommendationInput);
-    recommendations = result.recommendations;
-  } catch (error) {
-    console.error("Error fetching assessment recommendations:", error);
-    // Optionally, display an error message to the user or fallback content
-  }
-  
   const detailedRecommendations = recommendations
-    .map(title => findAssessmentByTitle(title))
-    .filter(Boolean); // Remove any nulls if assessment not found
+    .map((title) => findAssessmentByTitle(assessments, title))
+    .filter(Boolean);
 
   if (detailedRecommendations.length === 0) {
     return (
       <Card className="shadow-xl bg-card mt-8">
         <CardHeader>
           <CardTitle className="font-headline text-2xl flex items-center">
-             <Lightbulb className="w-7 h-7 mr-3 text-primary" /> Assessment Recommendations
+            <Lightbulb className="w-7 h-7 mr-3 text-primary" /> Assessment Recommendations
           </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground">
-            We couldn't find specific recommendations for you right now. Explore our diverse assessments!
+            We could not find specific recommendations for you right now. Explore our diverse assessments.
           </p>
-           <Link href="/assessments" className="mt-4 inline-block">
+          <Link href="/assessments" className="mt-4 inline-block">
             <Button>Browse All Assessments</Button>
           </Link>
         </CardContent>
@@ -116,37 +134,37 @@ export async function RecommendedAssessments({ user }: RecommendedAssessmentsPro
       </CardHeader>
       <CardContent>
         <p className="text-muted-foreground mb-6">
-          Based on your performance and interests, we think you'll find these assessments engaging:
+          Based on your performance and interests, we think you will find these assessments engaging:
         </p>
         <div className="grid md:grid-cols-2 gap-4">
-          {detailedRecommendations.map((assessment) => assessment && (
-            <Link href={`/assessments/${assessment.id}`} key={assessment.id}>
-              <div className="group p-4 border rounded-lg hover:shadow-lg hover:border-primary transition-all duration-200 h-full flex flex-col justify-between bg-background">
-                <div>
-                  <div className="flex items-center mb-2">
-                    <Image 
-                      src={`https://placehold.co/80x80.png?text=${assessment.category.substring(0,3)}`} 
-                      alt={assessment.category} 
-                      width={40} 
-                      height={40} 
-                      className="rounded-md mr-3"
-                      data-ai-hint={`${assessment.category} icon`}
-                    />
-                    <div>
-                      <h4 className="font-semibold text-lg text-foreground group-hover:text-primary transition-colors">{assessment.title}</h4>
-                      <p className="text-sm text-muted-foreground">{assessment.category}</p>
+          {detailedRecommendations.map((assessment) =>
+            assessment ? (
+              <Link href={`/assessments/${assessment.id}`} key={assessment.id}>
+                <div className="group p-4 border rounded-lg hover:shadow-lg hover:border-primary transition-all duration-200 h-full flex flex-col justify-between bg-background">
+                  <div>
+                    <div className="flex items-center mb-2">
+                      <Image
+                        src={`https://placehold.co/80x80.png?text=${assessment.category.substring(0, 3)}`}
+                        alt={assessment.category}
+                        width={40}
+                        height={40}
+                        className="rounded-md mr-3"
+                        data-ai-hint={`${assessment.category} icon`}
+                      />
+                      <div>
+                        <h4 className="font-semibold text-lg text-foreground group-hover:text-primary transition-colors">{assessment.title}</h4>
+                        <p className="text-sm text-muted-foreground">{assessment.category}</p>
+                      </div>
                     </div>
+                    <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{assessment.description}</p>
                   </div>
-                  <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-                    {assessment.description}
-                  </p>
+                  <Button variant="link" className="p-0 h-auto text-sm text-primary self-start">
+                    Start Assessment
+                  </Button>
                 </div>
-                <Button variant="link" className="p-0 h-auto text-sm text-primary self-start">
-                  Start Assessment &rarr;
-                </Button>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            ) : null
+          )}
         </div>
       </CardContent>
     </Card>

@@ -10,8 +10,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { LogIn, Home } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { MOCK_ADMIN_ID, ADMIN_EMAIL, ADMIN_PASSWORD, LOCAL_STORAGE_USERS_KEY, LOCAL_STORAGE_USER_ID_KEY } from "@/lib/constants";
-import type { StoredUser } from "@/lib/types";
 import { motion } from "framer-motion";
 
 export default function LoginPage() {
@@ -25,35 +23,27 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
 
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-
-    // Admin authentication
-    if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-      localStorage.setItem(LOCAL_STORAGE_USER_ID_KEY, MOCK_ADMIN_ID);
-      toast({ title: "Admin Login Successful", description: "Welcome, Admin!" });
-      router.push("/admin"); 
-      setIsLoading(false);
-      return;
-    }
-
-    // Regular user authentication (simplified: checks email, ignores password for this mock)
     try {
-      const usersString = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
-      const users: StoredUser[] = usersString ? JSON.parse(usersString) : [];
-      const foundUser = users.find(user => user.email === email);
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
-      if (foundUser) {
-        // In a real app, you would also verify the password here
-        localStorage.setItem(LOCAL_STORAGE_USER_ID_KEY, foundUser.id);
-        toast({ title: "Login Successful", description: `Welcome back, ${foundUser.name}!` });
-        router.push("/profile"); 
-      } else {
+      const payload = await response.json();
+
+      if (!response.ok) {
         toast({
           title: "Login Failed",
-          description: "Invalid email or password.",
+          description: payload?.message || "Invalid email or password.",
           variant: "destructive",
         });
+        return;
       }
+
+      toast({ title: "Login Successful", description: `Welcome back, ${payload.name}!` });
+      router.push(payload.role === "admin" ? "/admin" : "/profile");
+      router.refresh();
     } catch (error) {
       console.error("Login error:", error);
        toast({
@@ -75,10 +65,10 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-2xl">
         <CardHeader className="text-center">
           <Link href="/" className="inline-block mb-4">
-            <h1 className="text-4xl font-headline font-bold text-primary">EduAssess</h1>
+            <h1 className="text-4xl font-headline font-bold text-primary">QuestionFlow</h1>
           </Link>
           <CardTitle className="text-3xl font-headline">Login</CardTitle>
-          <CardDescription>Access your EduAssess account or the admin dashboard.</CardDescription>
+          <CardDescription>Design. Deliver. Analyze. Access your QuestionFlow account.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">

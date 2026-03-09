@@ -2,19 +2,21 @@
 
 import { Button } from "@/components/ui/button";
 import { ASSESSMENT_CATEGORIES } from "@/lib/constants";
-import type { AssessmentCategory } from "@/lib/types";
 import { ListFilter } from "lucide-react";
 
 interface AssessmentCategoryFilterProps {
-  selectedCategory: AssessmentCategory | null;
-  onSelectCategory: (category: AssessmentCategory | null) => void;
+  selectedCategory: string | null;
+  onSelectCategory: (category: string | null) => void;
+  availableCategories?: string[];
 }
 
 export function AssessmentCategoryFilter({
   selectedCategory,
   onSelectCategory,
+  availableCategories,
 }: AssessmentCategoryFilterProps) {
-  const categories: (AssessmentCategory | null)[] = [null, ...ASSESSMENT_CATEGORIES];
+  const categorySet = availableCategories && availableCategories.length > 0 ? availableCategories : ASSESSMENT_CATEGORIES;
+  const categories: (string | null)[] = [null, ...categorySet];
 
   return (
     <div className="mb-8 p-4 bg-card rounded-lg shadow">

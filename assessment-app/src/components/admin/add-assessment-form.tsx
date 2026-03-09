@@ -34,13 +34,27 @@ const addAssessmentSchema = z.object({
 
 type AddAssessmentFormValues = z.infer<typeof addAssessmentSchema>;
 
-// Placeholder for server action
 async function createAssessmentAction(data: AddAssessmentFormValues) {
-  console.log("Submitting new assessment:", data);
-  // Simulate API call
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  // throw new Error("Failed to save assessment. Please try again."); // Uncomment to test error
-  return { success: true, message: "Assessment created successfully!" };
+  const payload = {
+    ...data,
+    questions: data.questions.map((question, index) => ({
+      ...question,
+      id: `q-${index + 1}`,
+    })),
+  };
+
+  const response = await fetch("/api/assessments", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorPayload = await response.json().catch(() => null);
+    throw new Error(errorPayload?.message || "Failed to save assessment. Please try again.");
+  }
+
+  return { success: true, message: "Assessment created successfully." };
 }
 
 

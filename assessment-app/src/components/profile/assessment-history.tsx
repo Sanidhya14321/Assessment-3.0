@@ -62,7 +62,7 @@ export function AssessmentHistory({ history }: AssessmentHistoryProps) {
                     </Badge>
                   </div>
                   <div className="text-sm text-muted-foreground space-y-1">
-                    <p className="flex items-center"><Badge variant="outline" className="mr-2 border-accent text-accent">{result.category}</Badge></p>
+                    <div className="flex items-center"><Badge variant="outline" className="mr-2 border-accent text-accent">{result.category}</Badge></div>
                     <p className="flex items-center">
                       <Percent className="w-4 h-4 mr-1.5 text-primary" /> Score: {result.scorePercentage}%
                     </p>

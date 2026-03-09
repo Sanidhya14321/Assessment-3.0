@@ -1,31 +1,51 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AssessmentCard } from "@/components/assessments/assessment-card";
 import { AssessmentCategoryFilter } from "@/components/assessments/assessment-category-filter";
-import { PREDEFINED_ASSESSMENTS } from "@/lib/constants";
-import type { Assessment, AssessmentCategory } from "@/lib/types";
+import type { Assessment } from "@/lib/types";
 import { Input } from "@/components/ui/input";
-import { Search, Star, ThumbsUp } from "lucide-react";
+import { Loader2, Search, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AssessmentsPage() {
-  const [selectedCategory, setSelectedCategory] = useState<AssessmentCategory | null>(null);
+  const { toast } = useToast();
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [topic, setTopic] = useState("");
+  const [numberOfQuestions, setNumberOfQuestions] = useState("10");
+  const [difficulty, setDifficulty] = useState("medium");
+  const [isGenerating, setIsGenerating] = useState(false);
 
-  // Predefined assessments are always shown at the top
-  const predefinedAssessments = useMemo(() => {
-    return PREDEFINED_ASSESSMENTS.filter(assessment => assessment.isPredefined);
+  useEffect(() => {
+    const loadAssessments = async () => {
+      try {
+        setIsLoading(true);
+        const response = await fetch("/api/assessments", { cache: "no-store" });
+        if (!response.ok) throw new Error("Failed to load assessments");
+        const data: Assessment[] = await response.json();
+        setAssessments(data);
+      } catch (error) {
+        console.error(error);
+        setAssessments([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadAssessments();
   }, []);
 
-  // Other assessments (currently none, this is for future expansion)
-  // These would be filterable and searchable.
-  const otherAssessments = useMemo(() => {
-    return PREDEFINED_ASSESSMENTS.filter((assessment) => {
-      if (assessment.isPredefined) return false; // Exclude predefined from this list
-
+  const applyFilters = (source: Assessment[]) => {
+    return source.filter((assessment) => {
       const categoryMatch = selectedCategory ? assessment.category === selectedCategory : true;
       const searchTermMatch = searchTerm
         ? assessment.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -33,11 +53,79 @@ export default function AssessmentsPage() {
         : true;
       return categoryMatch && searchTermMatch;
     });
-  }, [selectedCategory, searchTerm]);
+  };
 
+  const adminAssessments = useMemo(() => {
+    const source = assessments.filter((assessment) => assessment.createdByRole === "admin" || assessment.isPredefined);
+    return applyFilters(source);
+  }, [assessments, selectedCategory, searchTerm]);
+
+  const userAssessments = useMemo(() => {
+    const source = assessments.filter((assessment) => assessment.createdByRole === "user");
+    return applyFilters(source);
+  }, [assessments, selectedCategory, searchTerm]);
+
+  const aiAssessments = useMemo(() => {
+    const source = assessments.filter((assessment) => assessment.createdByRole === "ai" || assessment.isAIGenerated);
+    return applyFilters(source);
+  }, [assessments, selectedCategory, searchTerm]);
+
+  const availableCategories = useMemo(() => {
+    const cats = Array.from(new Set(assessments.map((a) => a.category)));
+    return cats.sort();
+  }, [assessments]);
+
+  const handleGenerateAIAssessment = async () => {
+    if (!topic.trim()) return;
+
+    try {
+      setIsGenerating(true);
+      const response = await fetch("/api/assessments/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic,
+          numberOfQuestions: Number(numberOfQuestions),
+          difficulty,
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({ message: "Failed to generate assessment" }))) as {
+          message?: string;
+        };
+        throw new Error(payload.message ?? "Failed to generate assessment");
+      }
+      const generated: Assessment = await response.json();
+      setAssessments((prev) => [generated, ...prev]);
+      setSearchTerm("");
+      setSelectedCategory(null);
+      toast({ title: "Assessment Generated", description: "Your AI assessment is ready." });
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "Generation Failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center">
+        <div className="flex items-center gap-3 text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          Loading assessments...
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-8">
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -45,109 +133,107 @@ export default function AssessmentsPage() {
       >
         <h1 className="text-4xl font-headline font-bold text-primary mb-4">Explore Assessments</h1>
         <p className="text-xl text-muted-foreground">
-          Test your skills with our curated assessments or explore community contributions.
+          Admin-made, user-made, and AI-generated assessments in one place.
         </p>
       </motion.div>
 
-      {/* Featured Assessments Section */}
-      <section>
-        <div className="flex items-center mb-6">
-            <Star className="w-7 h-7 text-yellow-400 mr-3" />
-            <h2 className="text-3xl font-headline font-semibold text-foreground">Featured Assessments</h2>
+      <div className="flex flex-col md:flex-row gap-4 items-center">
+        <div className="relative w-full md:flex-grow">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search assessments..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 pr-4 py-2 w-full"
+          />
         </div>
-        {predefinedAssessments.length > 0 ? (
-          <motion.div 
-            layout 
-            className="grid sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-          >
-            <AnimatePresence>
-              {predefinedAssessments.map((assessment) => (
-                <motion.div
-                  key={assessment.id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <AssessmentCard assessment={assessment} />
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </motion.div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-10"
-          >
-            <Search className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-            <h3 className="text-xl font-semibold mb-1">No Featured Assessments</h3>
-            <p className="text-muted-foreground">Check back later for curated content.</p>
-          </motion.div>
-        )}
-      </section>
+      </div>
 
-      <Separator className="my-10" />
+      <AssessmentCategoryFilter
+        selectedCategory={selectedCategory}
+        onSelectCategory={setSelectedCategory}
+        availableCategories={availableCategories}
+      />
 
-      {/* Explore Other Assessments Section */}
-      <section>
-        <div className="flex items-center mb-6">
-            <ThumbsUp className="w-7 h-7 text-primary mr-3" />
-            <h2 className="text-3xl font-headline font-semibold text-foreground">Explore More</h2>
-        </div>
-        <div className="flex flex-col md:flex-row gap-4 items-center mb-6">
-          <div className="relative w-full md:flex-grow">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input
-                  type="text"
-                  placeholder="Search other assessments..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 w-full"
-              />
+      <Tabs defaultValue="admin" className="w-full">
+        <TabsList className="w-full md:w-auto">
+          <TabsTrigger value="admin">Admin Made Assessments</TabsTrigger>
+          <TabsTrigger value="user">User Made Assessments</TabsTrigger>
+          <TabsTrigger value="ai">AI Based Assessments</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="admin" className="pt-6">
+          {adminAssessments.length > 0 ? (
+            <motion.div layout className="grid sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <AnimatePresence>
+                {adminAssessments.map((assessment) => (
+                  <motion.div key={assessment.id} layout initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.3 }}>
+                    <AssessmentCard assessment={assessment} />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </motion.div>
+          ) : (
+            <div className="text-center py-10 text-muted-foreground">No admin-made assessments found.</div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="user" className="pt-6">
+          {userAssessments.length > 0 ? (
+            <motion.div layout className="grid sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <AnimatePresence>
+                {userAssessments.map((assessment) => (
+                  <motion.div key={assessment.id} layout initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.3 }}>
+                    <AssessmentCard assessment={assessment} />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </motion.div>
+          ) : (
+            <div className="text-center py-10 text-muted-foreground">No user-made assessments found yet.</div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="ai" className="pt-6 space-y-6">
+          <div className="grid md:grid-cols-4 gap-4 p-5 border-[3px] border-black rounded-[8px] bg-card">
+            <Input placeholder="Topic (e.g. Graph Algorithms)" value={topic} onChange={(e) => setTopic(e.target.value)} />
+            <Input type="number" min={3} max={25} value={numberOfQuestions} onChange={(e) => setNumberOfQuestions(e.target.value)} />
+            <Select value={difficulty} onValueChange={setDifficulty}>
+              <SelectTrigger>
+                <SelectValue placeholder="Difficulty" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="easy">Easy</SelectItem>
+                <SelectItem value="easy-medium">Easy-Medium</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="medium-hard">Medium-Hard</SelectItem>
+                <SelectItem value="hard">Hard</SelectItem>
+                <SelectItem value="professional">Professional</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button onClick={handleGenerateAIAssessment} disabled={isGenerating || !topic.trim()}>
+              {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />} Generate AI Assessment
+            </Button>
           </div>
-        </div>
-        
-        <AssessmentCategoryFilter
-          selectedCategory={selectedCategory}
-          onSelectCategory={setSelectedCategory}
-        />
 
-        {otherAssessments.length > 0 ? (
-          <motion.div 
-            layout 
-            className="grid sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-          >
-            <AnimatePresence>
-              {otherAssessments.map((assessment) => (
-                <motion.div
-                  key={assessment.id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <AssessmentCard assessment={assessment} />
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </motion.div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-10"
-          >
-            <Search className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-            <h3 className="text-xl font-semibold mb-1">No More Assessments Found</h3>
-            <p className="text-muted-foreground">
-              {searchTerm || selectedCategory ? "Try adjusting your search or category filters." : "More assessments coming soon!"}
-            </p>
-          </motion.div>
-        )}
-      </section>
+          <Separator />
+
+          {aiAssessments.length > 0 ? (
+            <motion.div layout className="grid sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <AnimatePresence>
+                {aiAssessments.map((assessment) => (
+                  <motion.div key={assessment.id} layout initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.3 }}>
+                    <AssessmentCard assessment={assessment} />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </motion.div>
+          ) : (
+            <div className="text-center py-10 text-muted-foreground">Generate your first AI assessment above.</div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Assessment {
+  id              String             @id
+  title           String
+  category        String
+  description     String
+  questions       Json
+  durationMinutes Int?
+  upvotes         Int                @default(0)
+  downvotes       Int                @default(0)
+  isPredefined    Boolean            @default(false)
+  createdByRole   String             @default("admin")
+  createdByUserId String?
+  isAIGenerated   Boolean            @default(false)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  results         AssessmentResult[]
+
+  @@index([category])
+  @@index([isPredefined])
+  @@index([createdByRole])
+  @@index([createdByUserId])
+}
+
+model AssessmentResult {
+  id             String     @id @default(cuid())
+  assessmentId   String
+  assessmentTitle String
+  category       String
+  userId         String
+  scorePercentage Int
+  answers        Json
+  completedAt    DateTime   @default(now())
+  createdAt      DateTime   @default(now())
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([assessmentId])
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("user")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([role])
+}

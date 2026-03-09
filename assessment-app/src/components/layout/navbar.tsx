@@ -2,45 +2,42 @@
 "use client";
 
 import Link from "next/link";
-import { Menu, X, Home, BookOpenCheck, UserCircle, ShieldCheck, LogIn, UserPlus, LogOut } from "lucide-react";
+import { Menu, X, Home, BookOpenCheck, UserCircle, ShieldCheck, LogIn, UserPlus, LogOut, PlusSquare, Sparkles } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { NAV_LINKS, MOCK_ADMIN_ID, LOCAL_STORAGE_USER_ID_KEY } from "@/lib/constants";
+import { NAV_LINKS } from "@/lib/constants";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { ModeSwitcher } from "@/components/layout/mode-switcher";
 
 type AuthRole = 'user' | 'admin' | null;
 
-const useAuth = () => {
+const useAuth = (refreshKey: string) => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [authRole, setAuthRole] = useState<AuthRole>(null);
 
   useEffect(() => {
-    const updateAuthState = () => {
-      const storedUserId = localStorage.getItem(LOCAL_STORAGE_USER_ID_KEY);
-      setCurrentUserId(storedUserId);
-      if (storedUserId === MOCK_ADMIN_ID) {
-        setAuthRole('admin');
-      } else if (storedUserId) {
-        setAuthRole('user');
-      } else {
+    const updateAuthState = async () => {
+      try {
+        const response = await fetch("/api/auth/me", { cache: "no-store" });
+        if (!response.ok) {
+          setCurrentUserId(null);
+          setAuthRole(null);
+          return;
+        }
+
+        const session: { userId: string; role: "user" | "admin" } = await response.json();
+        setCurrentUserId(session.userId);
+        setAuthRole(session.role);
+      } catch {
+        setCurrentUserId(null);
         setAuthRole(null);
       }
     };
 
-    updateAuthState(); // Initial check
-
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === LOCAL_STORAGE_USER_ID_KEY) {
-        updateAuthState();
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, []);
+    updateAuthState();
+  }, [refreshKey]);
 
 
   return { isAuthenticated: !!currentUserId, role: authRole, userId: currentUserId };
@@ -52,22 +49,22 @@ const iconMap: { [key: string]: React.ElementType } = {
   BookOpenCheck,
   UserCircle,
   ShieldCheck,
+  PlusSquare,
 };
 
 export function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { isAuthenticated, role } = useAuth(); // userId removed as it's internal to useAuth
   const pathname = usePathname();
+  const { isAuthenticated, role } = useAuth(pathname);
   const router = useRouter();
   const { toast } = useToast();
 
 
-  const handleLogout = () => {
-    localStorage.removeItem(LOCAL_STORAGE_USER_ID_KEY);
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
     toast({ title: "Logged Out", description: "You have been successfully logged out." });
-    // Trigger storage event manually for immediate effect in useAuth hook
-    window.dispatchEvent(new StorageEvent('storage', { key: LOCAL_STORAGE_USER_ID_KEY, newValue: null }));
     router.push('/'); // Redirect to home after logout
+    router.refresh();
     if (isMobileMenuOpen) closeMobileMenu();
   };
 
@@ -80,23 +77,32 @@ export function Navbar() {
   }
 
   const filteredNavLinks = NAV_LINKS.filter(link => {
+    if (role === 'admin' && link.href === '/') {
+      return false;
+    }
     if (link.adminOnly) {
       return isAuthenticated && role === 'admin';
     }
-    if (link.href === '/profile') { // Profile link visible if any user is logged in
-        return isAuthenticated;
+    if (link.href === '/assessments/create') {
+      return isAuthenticated;
+    }
+    if (link.href === '/profile') {
+      return isAuthenticated && role !== 'admin';
     }
     return true;
   });
 
   return (
-    <nav className="bg-card/80 backdrop-blur-lg shadow-md sticky top-0 z-50">
+    <nav className="bg-card border-b-[3px] border-black sticky top-0 z-50 shadow-[0_3px_0_0_#000]">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           <div className="flex-shrink-0">
             <Link href="/" className="text-3xl font-headline font-bold text-primary">
-              EduAssess
+              QuestionFlow
             </Link>
+            <p className="hidden lg:flex items-center text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground mt-1">
+              <Sparkles className="w-3 h-3 mr-1" /> Design. Deliver. Analyze.
+            </p>
           </div>
 
           <div className="hidden md:flex items-center space-x-6">
@@ -108,10 +114,10 @@ export function Navbar() {
                   key={link.label}
                   href={link.href}
                   className={cn(
-                    "inline-flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150 ease-in-out",
+                    "inline-flex items-center px-3 py-2 rounded-[6px] text-sm font-bold uppercase tracking-wide transition-colors duration-150 ease-in-out border-[2px] border-transparent",
                     isActive
-                      ? "bg-primary/10 text-primary"
-                      : "text-foreground/80 hover:text-primary hover:bg-primary/5"
+                      ? "bg-primary text-primary-foreground border-black shadow-[3px_3px_0_0_#000]"
+                      : "text-foreground hover:bg-secondary hover:border-black"
                   )}
                 >
                   {IconComponent && <IconComponent className="w-5 h-5 mr-2" />}
@@ -122,16 +128,9 @@ export function Navbar() {
           </div>
           
           <div className="hidden md:flex items-center space-x-3">
+            <ModeSwitcher />
             {isAuthenticated ? (
               <>
-                {role === 'admin' && (
-                  <Link href="/profile">
-                    <Button variant="outline" className="text-sm">
-                      <UserCircle className="w-5 h-5 mr-2" />
-                      Admin Profile
-                    </Button>
-                  </Link>
-                )}
                  {role === 'user' && (
                   <Link href="/profile">
                     <Button variant="outline" className="text-sm">
@@ -178,7 +177,7 @@ export function Navbar() {
       </div>
 
       {isMobileMenuOpen && (
-        <div className="md:hidden absolute top-20 left-0 right-0 bg-card shadow-lg z-40 pb-4">
+        <div className="md:hidden absolute top-20 left-0 right-0 bg-card border-b-[3px] border-black z-40 pb-4">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
             {filteredNavLinks.map((link) => {
               const IconComponent = iconMap[link.icon];
@@ -189,10 +188,10 @@ export function Navbar() {
                 href={link.href}
                 onClick={closeMobileMenu}
                 className={cn(
-                  "flex items-center px-3 py-3 rounded-md text-base font-medium transition-colors duration-150 ease-in-out",
+                  "flex items-center px-3 py-3 rounded-[6px] text-base font-bold uppercase tracking-wide transition-colors duration-150 ease-in-out border-[2px] border-transparent",
                   isActive
-                    ? "bg-primary/10 text-primary"
-                    : "text-foreground/80 hover:text-primary hover:bg-primary/5"
+                    ? "bg-primary text-primary-foreground border-black shadow-[3px_3px_0_0_#000]"
+                    : "text-foreground hover:bg-secondary hover:border-black"
                 )}
               >
                 {IconComponent && <IconComponent className="w-5 h-5 mr-3" />}
@@ -202,11 +201,16 @@ export function Navbar() {
             })}
           </div>
           <div className="pt-4 pb-3 border-t border-border/50">
+             <div className="px-5 mb-3">
+              <ModeSwitcher />
+             </div>
              {isAuthenticated ? (
                <>
-                <Link href="/profile" onClick={closeMobileMenu} className="flex items-center px-5 py-2 text-base font-medium text-foreground/80 hover:text-primary hover:bg-primary/5 rounded-md">
-                  <UserCircle className="w-5 h-5 mr-3" /> {role === 'admin' ? 'Admin Profile' : 'My Profile'}
-                </Link>
+                {role !== 'admin' && (
+                  <Link href="/profile" onClick={closeMobileMenu} className="flex items-center px-5 py-2 text-base font-medium text-foreground/80 hover:text-primary hover:bg-primary/5 rounded-md">
+                    <UserCircle className="w-5 h-5 mr-3" /> My Profile
+                  </Link>
+                )}
                 <Button variant="ghost" className="w-full justify-start text-base font-medium px-5 py-3 text-foreground/80 hover:text-primary hover:bg-primary/5" onClick={handleLogout}>
                     <LogOut className="w-5 h-5 mr-3" /> Logout
                 </Button>

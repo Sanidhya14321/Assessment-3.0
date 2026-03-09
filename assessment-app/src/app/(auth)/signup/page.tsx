@@ -11,8 +11,6 @@ import { UserPlus, Home } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ADMIN_EMAIL, LOCAL_STORAGE_USERS_KEY } from "@/lib/constants";
-import type { StoredUser } from "@/lib/types";
 
 export default function SignupPage() {
   const [name, setName] = useState("");
@@ -33,44 +31,31 @@ export default function SignupPage() {
       });
       return;
     }
-    if (email === ADMIN_EMAIL) {
-      toast({
-        title: "Registration Error",
-        description: "This email address is reserved for administration.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsLoading(true);
-    
-    // Simulate API call for signup
-    await new Promise(resolve => setTimeout(resolve, 1000));
 
     try {
-      const usersString = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
-      const users: StoredUser[] = usersString ? JSON.parse(usersString) : [];
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password }),
+      });
 
-      if (users.find(user => user.email === email)) {
+      const payload = await response.json();
+      if (!response.ok) {
         toast({
           title: "Signup Failed",
-          description: "An account with this email already exists.",
+          description: payload?.message || "An account with this email already exists.",
           variant: "destructive",
         });
-        setIsLoading(false);
         return;
       }
-
-      const newUserId = `user-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-      const newUser: StoredUser = { id: newUserId, name, email };
-      users.push(newUser);
-      localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(users));
       
       toast({
         title: "Signup Successful",
-        description: "Welcome! Please login to continue.",
+        description: "Your account has been created.",
       });
-      router.push("/login");
+      router.push(payload.role === "admin" ? "/admin" : "/profile");
+      router.refresh();
     } catch (error) {
       console.error("Signup error:", error);
       toast({
@@ -92,10 +77,10 @@ export default function SignupPage() {
       <Card className="w-full max-w-md shadow-2xl">
         <CardHeader className="text-center">
           <Link href="/" className="inline-block mb-4">
-            <h1 className="text-4xl font-headline font-bold text-primary">EduAssess</h1>
+            <h1 className="text-4xl font-headline font-bold text-primary">QuestionFlow</h1>
           </Link>
           <CardTitle className="text-3xl font-headline">Create Account</CardTitle>
-          <CardDescription>Join EduAssess and start your learning adventure today.</CardDescription>
+          <CardDescription>Join QuestionFlow and start building better assessments.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">

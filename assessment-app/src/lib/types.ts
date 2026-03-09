@@ -11,14 +11,6 @@ export interface User {
   interests?: string[]; // For AI recommendation
 }
 
-// Minimal user info stored in localStorage for registration
-export interface StoredUser {
-  id: string;
-  name: string;
-  email: string;
-  // Password is not stored for simplicity/security in this mock setup
-}
-
 export interface Question {
   id: string;
   questionText: string;
@@ -32,7 +24,7 @@ export type AssessmentCategory = 'AI/ML' | 'Web Development' | 'Data Structures'
 export interface Assessment {
   id: string;
   title: string;
-  category: AssessmentCategory;
+  category: string;
   description: string;
   questions: Question[];
   durationMinutes?: number; // Optional: duration in minutes
@@ -40,12 +32,15 @@ export interface Assessment {
   upvotes: number;
   downvotes: number;
   isPredefined?: boolean;
+  createdByRole?: UserRole | "ai";
+  createdByUserId?: string | null;
+  isAIGenerated?: boolean;
 }
 
 export interface AssessmentResult {
   assessmentId: string;
   assessmentTitle: string;
-  category: AssessmentCategory;
+  category: string;
   userId: string;
   scorePercentage: number;
   answers: { questionId: string; selectedAnswer: string }[];

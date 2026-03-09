@@ -1,73 +1,72 @@
-// src/ai/flows/assessment-recommendation.ts
 'use server';
 
-/**
- * @fileOverview Provides assessment recommendations based on user history.
- *
- * - assessmentRecommendation - A function that returns recommended assessments.
- * - AssessmentRecommendationInput - The input type for the assessmentRecommendation function.
- * - AssessmentRecommendationOutput - The return type for the assessmentRecommendation function.
- */
-
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { z } from 'zod';
+import Groq from 'groq-sdk';
+import { GROQ_MODEL } from '@/ai/genkit';
 
 const AssessmentRecommendationInputSchema = z.object({
-  userHistory: z
-    .array(z.object({
-      assessmentCategory: z.string().describe('The category of the assessment taken (e.g., AI/ML, Web Development).'),
-      score: z.number().describe('The score achieved on the assessment (0-100).'),
-      interests: z.string().describe('The stated interests of the user')
-    }))
-    .describe('The user assessment history, including category and score.'),
-  availableAssessments: z.array(z.object({
-    assessmentCategory: z.string().describe('The category of the available assessment.'),
-    assessmentTitle: z.string().describe('The title of the available assessment.'),
-  })).describe('A list of available assessments and their categories.'),
+  userHistory: z.array(
+    z.object({
+      assessmentCategory: z.string(),
+      score: z.number(),
+      interests: z.string(),
+    })
+  ),
+  availableAssessments: z.array(
+    z.object({
+      assessmentCategory: z.string(),
+      assessmentTitle: z.string(),
+    })
+  ),
 });
 
 export type AssessmentRecommendationInput = z.infer<typeof AssessmentRecommendationInputSchema>;
 
 const AssessmentRecommendationOutputSchema = z.object({
-  recommendations: z
-    .array(z.string())
-    .describe('Recommended assessments based on user history and interests.'),
+  recommendations: z.array(z.string()),
 });
 
 export type AssessmentRecommendationOutput = z.infer<typeof AssessmentRecommendationOutputSchema>;
 
-export async function assessmentRecommendation(input: AssessmentRecommendationInput): Promise<AssessmentRecommendationOutput> {
-  return assessmentRecommendationFlow(input);
-}
+export async function assessmentRecommendation(
+  input: AssessmentRecommendationInput
+): Promise<AssessmentRecommendationOutput> {
+  const parsedInput = AssessmentRecommendationInputSchema.parse(input);
+  const apiKey = process.env.GROQ_API_KEY;
 
-const prompt = ai.definePrompt({
-  name: 'assessmentRecommendationPrompt',
-  input: {schema: AssessmentRecommendationInputSchema},
-  output: {schema: AssessmentRecommendationOutputSchema},
-  prompt: `Based on the user's assessment history and stated interests, recommend assessments.
-
-User Assessment History:
-{{#each userHistory}}
-- Category: {{this.assessmentCategory}}, Score: {{this.score}}, Interests: {{this.interests}}
-{{/each}}
-
-Available Assessments:
-{{#each availableAssessments}}
-- Category: {{this.assessmentCategory}}, Title: {{this.assessmentTitle}}
-{{/each}}
-
-Given the user's past performance and stated interests, recommend the assessments most relevant to them. Focus on assessments where the user has performed well in similar categories or expressed explicit interest. Return only the titles of the recommended assessments.
-`,  
-});
-
-const assessmentRecommendationFlow = ai.defineFlow(
-  {
-    name: 'assessmentRecommendationFlow',
-    inputSchema: AssessmentRecommendationInputSchema,
-    outputSchema: AssessmentRecommendationOutputSchema,
-  },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
+  if (!apiKey) {
+    return { recommendations: [] };
   }
-);
+
+  const client = new Groq({ apiKey });
+
+  const prompt = [
+    'You are an assessment recommender.',
+    'Return strict JSON only with this shape: {"recommendations": ["title"]}.',
+    'Recommend up to 4 assessments from the provided available assessments.',
+    'Prioritize categories where user has stronger scores and matching interests.',
+    `User History: ${JSON.stringify(parsedInput.userHistory)}`,
+    `Available Assessments: ${JSON.stringify(parsedInput.availableAssessments)}`,
+  ].join('\n');
+
+  const completion = await client.chat.completions.create({
+    model: GROQ_MODEL,
+    temperature: 0.2,
+    response_format: { type: 'json_object' },
+    messages: [
+      {
+        role: 'user',
+        content: prompt,
+      },
+    ],
+  });
+
+  const rawContent = completion.choices[0]?.message?.content ?? '{"recommendations": []}';
+
+  try {
+    const parsed = JSON.parse(rawContent);
+    return AssessmentRecommendationOutputSchema.parse(parsed);
+  } catch {
+    return { recommendations: [] };
+  }
+}

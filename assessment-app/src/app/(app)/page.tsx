@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { motion } from "framer-motion";
-import { ArrowRight, BarChart3, Brain, Lightbulb, UserCheck, ShieldCheck } from "lucide-react";
+import { ArrowRight, BarChart3, Brain, Lightbulb, UserCheck, ShieldCheck, TerminalSquare } from "lucide-react";
 import Image from "next/image";
 
 const FeatureCard = ({ icon: Icon, title, description, delay }: { icon: React.ElementType, title: string, description: string, delay: number }) => (
@@ -42,7 +42,7 @@ export default function HomePage() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, delay: 0.2 }}
           >
-            Welcome to <span className="text-primary">EduAssess</span>
+            Welcome to <span className="text-primary">QuestionFlow</span>
           </motion.h1>
           <motion.p 
             className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto mb-10"
@@ -50,27 +50,47 @@ export default function HomePage() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.4 }}
           >
-            Sharpen your Computer Science skills with interactive assessments and personalized feedback.
-            Explore diverse topics and track your progress towards mastery.
+            Design. Deliver. Analyze. Host assessments, run skill checks, and review deep performance insights.
           </motion.p>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.6 }}
+            className="flex flex-wrap justify-center gap-4"
           >
             <Link href="/assessments">
               <Button size="lg" className="text-lg px-8 py-6 bg-primary hover:bg-primary/90 text-primary-foreground">
                 Explore Assessments <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
+            <Link href="/assessments/create">
+              <Button size="lg" variant="outline" className="text-lg px-8 py-6">
+                Host An Assessment
+              </Button>
+            </Link>
           </motion.div>
         </div>
       </motion.section>
 
+      <section className="py-8">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-2xl">
+              <TerminalSquare className="w-6 h-6" /> Upcoming Features
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              Terminal-based coding test and analysis is planned and will be integrated as a future release.
+            </p>
+          </CardContent>
+        </Card>
+      </section>
+
       {/* Features Section */}
       <section className="py-12">
         <h2 className="text-4xl font-headline font-bold text-center mb-12">
-          Why Choose <span className="text-primary">EduAssess</span>?
+          Why Choose <span className="text-primary">QuestionFlow</span>?
         </h2>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
           <FeatureCard
@@ -117,17 +137,17 @@ export default function HomePage() {
         <h2 className="text-4xl font-headline font-bold text-center mb-12 text-primary">How It Works</h2>
         <div className="grid md:grid-cols-3 gap-8 text-center">
           <motion.div initial={{opacity: 0, x: -50}} whileInView={{opacity:1, x:0}} transition={{duration:0.5, delay: 0.2}} viewport={{ once: true }}>
-            <Image src="https://placehold.co/300x200.png" alt="Browse Assessments" width={300} height={200} className="mx-auto mb-4 rounded-lg shadow-md" data-ai-hint="browsing online courses" />
+            <Image src="/1.png" alt="Browse Assessments" width={300} height={200} className="mx-auto mb-4 rounded-lg shadow-md" data-ai-hint="browsing online courses" />
             <h3 className="text-2xl font-headline font-semibold mb-2">1. Browse & Select</h3>
             <p className="text-muted-foreground">Choose an assessment from various CS categories.</p>
           </motion.div>
           <motion.div initial={{opacity: 0, y: 50}} whileInView={{opacity:1, y:0}} transition={{duration:0.5, delay: 0.4}} viewport={{ once: true }}>
-            <Image src="https://placehold.co/300x200.png" alt="Take Assessment" width={300} height={200} className="mx-auto mb-4 rounded-lg shadow-md" data-ai-hint="online test taking" />
+            <Image src="/2.png" alt="Take Assessment" width={300} height={200} className="mx-auto mb-4 rounded-lg shadow-md" data-ai-hint="online test taking" />
             <h3 className="text-2xl font-headline font-semibold mb-2">2. Take the Test</h3>
             <p className="text-muted-foreground">Answer questions in our interactive environment.</p>
           </motion.div>
           <motion.div initial={{opacity: 0, x: 50}} whileInView={{opacity:1, x:0}} transition={{duration:0.5, delay: 0.6}} viewport={{ once: true }}>
-            <Image src="https://placehold.co/300x200.png" alt="View Results" width={300} height={200} className="mx-auto mb-4 rounded-lg shadow-md" data-ai-hint="dashboard analytics results" />
+            <Image src="/3.png" alt="View Results" width={300} height={200} className="mx-auto mb-4 rounded-lg shadow-md" data-ai-hint="dashboard analytics results" />
             <h3 className="text-2xl font-headline font-semibold mb-2">3. Get Results</h3>
             <p className="text-muted-foreground">See your score instantly and review performance.</p>
           </motion.div>
